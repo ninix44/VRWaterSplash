@@ -24,10 +24,6 @@ public class ExampleAddonClient implements VisorAddon {
                     )
                 )
             );
-
-        new WaterSplashHandler();
-
-        System.out.println("VR water splash & overlays loaded?");
     }
 
     @Override

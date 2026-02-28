@@ -1,6 +1,6 @@
-package me.phoenixra.visorexample.core.client;
+package me.phoenixra.visorexample.fabric;
 
-import dev.architectury.event.events.client.ClientTickEvent;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import me.phoenixra.visor.api.VisorAPI;
 import me.phoenixra.visor.api.client.player.VRLocalPlayer;
 import me.phoenixra.visor.api.client.player.pose.PlayerPoseClient;
@@ -17,62 +17,54 @@ import org.joml.Vector3fc;
 
 public class WaterSplashHandler {
 
-    private Vec3 lastMainHandPos = Vec3.ZERO;
-    private Vec3 lastOffHandPos = Vec3.ZERO;
-    private Vec3 lastDesktopPos = Vec3.ZERO;
+    private Vec3 lastMainHandPos = null;
+    private Vec3 lastOffHandPos = null;
+    private Vec3 lastDesktopPos = null;
 
     public WaterSplashHandler() {
-        ClientTickEvent.CLIENT_POST.register(this::onTick);
+        ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
     }
 
     private void onTick(Minecraft mc) {
         if (mc.player == null || mc.level == null || mc.isPaused()) return;
 
-        // Мышка работает ВСЕГДА для тестов (потом убрать, если нужно будет)
-        Vec3 eyePos = mc.player.getEyePosition();
-        Vec3 lookVec = mc.player.getLookAngle();
-        Vec3 currentDesktopHandPos = eyePos.add(lookVec.scale(1.5));
-
-        if (lastDesktopPos != Vec3.ZERO) {
-            double speed = currentDesktopHandPos.distanceTo(lastDesktopPos);
-
-            BlockPos pos = BlockPos.containing(currentDesktopHandPos.x, currentDesktopHandPos.y, currentDesktopHandPos.z);
-            boolean isWater = mc.level.getBlockState(pos).is(Blocks.WATER);
-            boolean isSurface = mc.level.getBlockState(pos.above()).isAir();
-
-            if (isWater && isSurface && speed > 0.05) {
-                spawnSplash(mc, currentDesktopHandPos, speed, null);
-            }
+        Vec3 currentDesktop = mc.player.getEyePosition().add(mc.player.getLookAngle().scale(1.5));
+        if (lastDesktopPos != null) {
+            checkSplash(mc, currentDesktop, lastDesktopPos, null);
         }
-        lastDesktopPos = currentDesktopHandPos;
+        lastDesktopPos = currentDesktop;
 
         VRLocalPlayer vrPlayer = VisorAPI.client().getVRLocalPlayer();
-
         if (vrPlayer != null && VisorAPI.clientState().playMode().canPlayVR()) {
             PlayerPoseClient pose = vrPlayer.getPoseData(PlayerPoseType.RENDER);
 
             Vec3 currentMain = toVec3(pose.getMainHand().getPosition());
-            if (lastMainHandPos != Vec3.ZERO) {
-                double speed = currentMain.distanceTo(lastMainHandPos);
-                BlockPos pos = BlockPos.containing(currentMain.x, currentMain.y, currentMain.z);
-                if (mc.level.getBlockState(pos).is(Blocks.WATER) && mc.level.getBlockState(pos.above()).isAir() && speed > 0.05) {
-                    spawnSplash(mc, currentMain, speed, HandType.MAIN);
-                }
+            if (lastMainHandPos != null) {
+                checkSplash(mc, currentMain, lastMainHandPos, HandType.MAIN);
             }
             lastMainHandPos = currentMain;
 
             Vec3 currentOff = toVec3(pose.getOffhand().getPosition());
-            if (lastOffHandPos != Vec3.ZERO) {
-                double speed = currentOff.distanceTo(lastOffHandPos);
-                BlockPos pos = BlockPos.containing(currentOff.x, currentOff.y, currentOff.z);
-                if (mc.level.getBlockState(pos).is(Blocks.WATER) && mc.level.getBlockState(pos.above()).isAir() && speed > 0.05) {
-                    spawnSplash(mc, currentOff, speed, HandType.OFFHAND);
-                }
+            if (lastOffHandPos != null) {
+                checkSplash(mc, currentOff, lastOffHandPos, HandType.OFFHAND);
             }
             lastOffHandPos = currentOff;
         }
     }
 
+    private void checkSplash(Minecraft mc, Vec3 current, Vec3 last, HandType hand) {
+        double speed = current.distanceTo(last);
+        if (speed < 0.05) return;
+
+        BlockPos pos = BlockPos.containing(current.x, current.y, current.z);
+        if (mc.level.getBlockState(pos).is(Blocks.WATER) && mc.level.getBlockState(pos.above()).isAir()) {
+            spawnSplash(mc, current, speed, hand);
+        }
+    }
+
+
+    // todo Если рука чуть-чуть входит в воду, то сразу плесканье сделать
+    // todo сделать волны, будет зависеть от удара по воде через GLSL Shader
     private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType handType) {
         for (int i = 0; i < 10; i++) {
             mc.level.addParticle(
@@ -89,6 +81,7 @@ public class WaterSplashHandler {
                 SoundEvents.PLAYER_SPLASH, SoundSource.PLAYERS,
                 0.4f, 1.0f + (float)(Math.random() * 0.4), false);
 
+            // todo поиграться с вибрацией phoenixra
             if (handType != null) {
                 float amplitude = (float) Math.min(speed * 4.0, 0.7);
 

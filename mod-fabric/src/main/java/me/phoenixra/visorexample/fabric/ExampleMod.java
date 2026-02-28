@@ -15,8 +15,10 @@ public class ExampleMod implements ModInitializer {
             );
         }else{
             VisorAPI.registerAddon(
-                    new ExampleAddonClient()
+                new ExampleAddonClient()
             );
+
+            new WaterSplashHandler();
         }
     }
 }
