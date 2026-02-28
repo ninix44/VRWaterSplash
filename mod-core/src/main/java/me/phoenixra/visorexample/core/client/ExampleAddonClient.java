@@ -11,18 +11,23 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 public class ExampleAddonClient implements VisorAddon {
+
     @Override
     public void onAddonLoad() {
         VisorAPI.addonManager().getRegistries()
-                .overlays()
-                .registerElements(
-                        List.of(
-                                new VROverlayExample(
-                                        this,
-                                        VROverlayExample.ID
-                                )
-                        )
-                );
+            .overlays()
+            .registerElements(
+                List.of(
+                    new VROverlayExample(
+                        this,
+                        VROverlayExample.ID
+                    )
+                )
+            );
+
+        new WaterSplashHandler();
+
+        System.out.println("VR water splash & overlays loaded?");
     }
 
     @Override
