@@ -21,6 +21,10 @@ public class WaterSplashHandler {
         if (mc.player == null || mc.level == null || mc.isPaused()) return;
 
         // testing hand position (без vr очков и контроллеров)
+        // todo заменить на позиции рук из VisorAPI (if/else for testing)
+
+        //VisorAPI.client().getVRLocalPlayer()
+
         Vec3 eyePos = mc.player.getEyePosition();
         Vec3 lookVec = mc.player.getLookAngle();
         Vec3 currentHandPos = eyePos.add(lookVec.scale(1.5));
@@ -30,28 +34,32 @@ public class WaterSplashHandler {
         BlockPos pos = BlockPos.containing(currentHandPos.x, currentHandPos.y, currentHandPos.z);
         boolean isWater = mc.level.getBlockState(pos).is(Blocks.WATER);
 
-        if (isWater && speed > 0.05) {
+        boolean isSurface = mc.level.getBlockState(pos.above()).isAir();
 
-            //System.out.println("splash detected Speed: " + speed);
+        // boolean isSurface = !mc.level.getBlockState(pos.above()).is(Blocks.WATER);
+
+        if (isWater && isSurface && speed > 0.05) {
 
             for (int i = 0; i < 10; i++) {
                 mc.level.addParticle(
                     ParticleTypes.SPLASH,
                     currentHandPos.x + (Math.random() - 0.5) * 0.3,
-                    currentHandPos.y + 0.1,
+                    Math.floor(currentHandPos.y) + 0.9,
                     currentHandPos.z + (Math.random() - 0.5) * 0.3,
                     0, 0.2, 0
                 );
             }
 
-            mc.level.playLocalSound(
-                currentHandPos.x, currentHandPos.y, currentHandPos.z,
-                SoundEvents.PLAYER_SPLASH,
-                SoundSource.PLAYERS,
-                1.0f,
-                1.0f + (float)(Math.random() * 0.2),
-                false
-            );
+            if (speed > 0.1) {
+                mc.level.playLocalSound(
+                    currentHandPos.x, currentHandPos.y, currentHandPos.z,
+                    SoundEvents.PLAYER_SPLASH,
+                    SoundSource.PLAYERS,
+                    0.4f,
+                    1.0f + (float)(Math.random() * 0.4),
+                    false
+                );
+            }
 
             // todo haptic, вибрация для контроллеров, у меня пока нету, нужно будет также подключить VisorAPI
             // VisorAPI.haptics().trigger(Hand.RIGHT, 0.1f, 1.0f); // +-
