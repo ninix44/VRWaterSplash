@@ -1,9 +1,9 @@
-package me.phoenixra.visorexample.core.client;
+package dev.ninix.visor.watersplash.core.client;
 
-import me.phoenixra.visor.api.VisorAPI;
-import me.phoenixra.visor.api.common.addon.VisorAddon;
-import me.phoenixra.visorexample.core.client.overlays.VROverlayExample;
-import me.phoenixra.visorexample.core.common.VisorExample;
+import org.vmstudio.visor.api.VisorAPI;
+import org.vmstudio.visor.api.common.addon.VisorAddon;
+import dev.ninix.visor.watersplash.core.client.overlays.VROverlayExample;
+import dev.ninix.visor.watersplash.core.common.VisorExample;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -16,7 +16,7 @@ public class ExampleAddonClient implements VisorAddon {
     public void onAddonLoad() {
         VisorAPI.addonManager().getRegistries()
             .overlays()
-            .registerElements(
+            .registerComponents(
                 List.of(
                     new VROverlayExample(
                         this,

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "visor_example",
+  "id": "watersplash",
   "version": "${version}",
 
-  "name": "VisorExample",
+  "name": "VisorWaterSplash",
   "description": "The Example Addon for Visor",
   "authors": [
     "PhoenixRa"
@@ -12,7 +12,7 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "me.phoenixra.visorexample.fabric.ExampleMod"
+      "dev.ninix.visor.watersplash.fabric.ExampleMod"
     ]
   },
   "mixins": [
@@ -24,7 +24,7 @@
     "java": ">=17"
   },
   "breaks": {
-    "visor": "<0.2.0"
+    "visor": "<0.3.0"
   },
   "suggests": {
     "another-mod": "*"

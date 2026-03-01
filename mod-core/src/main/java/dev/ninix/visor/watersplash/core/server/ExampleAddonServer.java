@@ -1,7 +1,7 @@
-package me.phoenixra.visorexample.core.server;
+package dev.ninix.visor.watersplash.core.server;
 
-import me.phoenixra.visor.api.common.addon.VisorAddon;
-import me.phoenixra.visorexample.core.common.VisorExample;
+import org.vmstudio.visor.api.common.addon.VisorAddon;
+import dev.ninix.visor.watersplash.core.common.VisorExample;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

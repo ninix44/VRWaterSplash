@@ -1,13 +1,13 @@
-package me.phoenixra.visorexample.core.client.overlays;
+package dev.ninix.visor.watersplash.core.client.overlays;
 
 import me.phoenixra.atumvr.api.misc.color.AtumColor;
-import me.phoenixra.visor.api.client.gui.overlays.RegisterVROverlayTemplate;
-import me.phoenixra.visor.api.client.gui.overlays.framework.template.VROverlayTemplateScreen;
-import me.phoenixra.visor.api.client.gui.overlays.options.OverlayOptionGroup;
-import me.phoenixra.visor.api.client.gui.overlays.options.types.OverlayOptionsMisc;
-import me.phoenixra.visor.api.client.gui.overlays.options.types.OverlayOptionsPose;
-import me.phoenixra.visor.api.client.player.pose.PoseAnchor;
-import me.phoenixra.visor.api.common.addon.VisorAddon;
+import org.vmstudio.visor.api.client.gui.overlays.RegisterVROverlayTemplate;
+import org.vmstudio.visor.api.client.gui.overlays.framework.template.VROverlayTemplateScreen;
+import org.vmstudio.visor.api.client.gui.overlays.options.OverlayOptionGroup;
+import org.vmstudio.visor.api.client.gui.overlays.options.types.OverlayOptionsMisc;
+import org.vmstudio.visor.api.client.gui.overlays.options.types.OverlayOptionsPose;
+import org.vmstudio.visor.api.client.player.pose.PoseAnchor;
+import org.vmstudio.visor.api.common.addon.VisorAddon;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
@@ -36,7 +36,7 @@ public class VROverlayTemplateExample extends VROverlayTemplateScreen {
     @Override
     protected void onRender(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
         guiGraphics.drawCenteredString(this.font, text,
-                width/2, height/2, AtumColor.WHITE.toInt());
+                width/2, height/2, AtumColor.WHITE.asInt());
 
     }
 

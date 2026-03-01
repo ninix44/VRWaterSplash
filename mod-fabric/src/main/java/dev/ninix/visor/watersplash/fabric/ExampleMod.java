@@ -1,9 +1,9 @@
-package me.phoenixra.visorexample.fabric;
+package dev.ninix.visor.watersplash.fabric;
 
-import me.phoenixra.visor.api.ModLoader;
-import me.phoenixra.visor.api.VisorAPI;
-import me.phoenixra.visorexample.core.client.ExampleAddonClient;
-import me.phoenixra.visorexample.core.server.ExampleAddonServer;
+import org.vmstudio.visor.api.ModLoader;
+import org.vmstudio.visor.api.VisorAPI;
+import dev.ninix.visor.watersplash.core.client.ExampleAddonClient;
+import dev.ninix.visor.watersplash.core.server.ExampleAddonServer;
 import net.fabricmc.api.ModInitializer;
 
 public class ExampleMod implements ModInitializer {

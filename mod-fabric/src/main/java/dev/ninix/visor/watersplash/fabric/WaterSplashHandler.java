@@ -1,11 +1,11 @@
-package me.phoenixra.visorexample.fabric;
+package dev.ninix.visor.watersplash.fabric;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import me.phoenixra.visor.api.VisorAPI;
-import me.phoenixra.visor.api.client.player.VRLocalPlayer;
-import me.phoenixra.visor.api.client.player.pose.PlayerPoseClient;
-import me.phoenixra.visor.api.client.player.pose.PlayerPoseType;
-import me.phoenixra.visor.api.common.HandType;
+import org.vmstudio.visor.api.VisorAPI;
+import org.vmstudio.visor.api.client.player.VRLocalPlayer;
+import org.vmstudio.visor.api.client.player.pose.PlayerPoseClient;
+import org.vmstudio.visor.api.client.player.pose.PlayerPoseType;
+import org.vmstudio.visor.api.common.HandType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -60,23 +60,21 @@ public class WaterSplashHandler {
         BlockPos pos = BlockPos.containing(current.x, current.y, current.z);
         boolean isInWater = mc.level.getBlockState(pos).is(Blocks.WATER);
 
+        boolean isSurface = isInWater && mc.level.getBlockState(pos.above()).isAir();
         boolean justEntered = isInWater && !wasInWater;
 
         Vec3 movement = current.subtract(last);
         double horizontalSpeed = Math.sqrt(movement.x * movement.x + movement.z * movement.z);
-        double verticalSpeed = movement.y;
         double totalSpeed = movement.length();
 
-        boolean isSurface = isInWater && mc.level.getBlockState(pos.above()).isAir();
-
-
-        if (isSurface || justEntered) {
-            if (justEntered && totalSpeed > 0.01) {
+        if (justEntered) {
+            if (totalSpeed > 0.01) {
                 spawnSplash(mc, current, totalSpeed, hand, true);
             }
-            else if (horizontalSpeed > 0.07 || verticalSpeed < -0.08) {
-                double splashForce = Math.max(horizontalSpeed, Math.abs(verticalSpeed));
-                spawnSplash(mc, current, splashForce, hand, false);
+        }
+        else if (isSurface) {
+            if (horizontalSpeed > 0.07) {
+                spawnSplash(mc, current, horizontalSpeed, hand, false);
             }
         }
 
@@ -85,7 +83,7 @@ public class WaterSplashHandler {
 
     // todo сделать волны, будет зависеть от удара по воде через GLSL Shader
     private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType handType, boolean isEntry) {
-        int particleCount = isEntry ? 3 : (int) Math.min(speed * 40, 12);
+        int particleCount = isEntry ? (int) Math.min(speed * 50, 15) : (int) Math.min(speed * 40, 10);
 
         for (int i = 0; i < particleCount; i++) {
             mc.level.addParticle(
@@ -94,22 +92,22 @@ public class WaterSplashHandler {
                 Math.floor(pos.y) + 0.95,
                 pos.z + (Math.random() - 0.5) * 0.4,
                 (Math.random() - 0.5) * 0.1,
-                0.1 + Math.random() * 0.2,
+                isEntry ? 0.1 + Math.random() * 0.3 : 0.05 + Math.random() * 0.1,
                 (Math.random() - 0.5) * 0.1
             );
         }
 
         if (speed > 0.08 || isEntry) {
-            float volume = isEntry ? 0.2f : (float) Math.min(speed * 2.0, 0.5);
+            float volume = isEntry ? (float) Math.min(speed * 2.5, 0.6) : (float) Math.min(speed * 1.5, 0.4);
             mc.level.playLocalSound(pos.x, pos.y, pos.z,
                 SoundEvents.PLAYER_SPLASH, SoundSource.PLAYERS,
-                volume, 1.2f + (float)(Math.random() * 0.4), false);
+                volume, 1.0f + (float)(Math.random() * 0.5), false);
 
             // todo добавить в ГУИ с другими аддонами настройку "регулятор" вибрации, чтобы настроить до идеала, а потом уже в коде поменять
             if (handType != null) {
-                float amplitude = isEntry ? 0.15f : (float) Math.min(speed * 3.0, 0.7);
+                float amplitude = isEntry ? (float) Math.min(speed * 4.0, 0.8) : (float) Math.min(speed * 2.5, 0.5);
 
-                float frequency = isEntry ? 40.0f : 100.0f;
+                float frequency = isEntry ? 120.0f : 70.0f;
                 float duration = 0.05f;
 
                 VisorAPI.client().getInputManager().triggerHapticPulse(

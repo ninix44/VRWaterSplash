@@ -1,8 +1,8 @@
-package me.phoenixra.visorexample.core.client.overlays;
+package dev.ninix.visor.watersplash.core.client.overlays;
 
 
-import me.phoenixra.visor.api.client.gui.overlays.framework.VROverlayScreen;
-import me.phoenixra.visor.api.common.addon.VisorAddon;
+import org.vmstudio.visor.api.client.gui.overlays.framework.VROverlayScreen;
+import org.vmstudio.visor.api.common.addon.VisorAddon;
 import net.minecraft.client.gui.GuiGraphics;
 import org.jetbrains.annotations.NotNull;
 
