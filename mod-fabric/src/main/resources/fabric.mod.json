@@ -4,9 +4,9 @@
   "version": "${version}",
 
   "name": "VisorWaterSplash",
-  "description": "The Example Addon for Visor",
+  "description": "Water splash for Visor",
   "authors": [
-    "PhoenixRa"
+    "Ninix"
   ],
   "license": "MIT",
   "environment": "*",
@@ -21,12 +21,10 @@
   "depends": {
     "fabricloader": ">=0.14.14",
     "minecraft": ["1.20", "1.20.1"],
-    "java": ">=17"
-  },
-  "breaks": {
-    "visor": "<0.3.0"
+    "java": ">=17",
+    "visor": "*"
   },
   "suggests": {
-    "another-mod": "*"
+    "sodium": ">=0.5.0"
   }
 }

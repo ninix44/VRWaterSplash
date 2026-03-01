@@ -15,6 +15,10 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3fc;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 public class WaterSplashHandler {
 
     private Vec3 lastMainHandPos = null;
@@ -25,12 +29,68 @@ public class WaterSplashHandler {
     private boolean wasOffInWater = false;
     private boolean wasDesktopInWater = false;
 
+    private final List<WaveRing> activeWaves = new ArrayList<>();
+
     public WaterSplashHandler() {
         ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
     }
 
+    private static class WaveRing {
+        double x, z;
+        double radius;
+        double maxRadius;
+        double expansionSpeed;
+        int particleCount;
+        float alpha;
+        double yOffset;
+
+        double wavePhase;
+        double waveSpeed;
+        double waveHeight;
+
+        WaveRing(double x, double z, double yOffset, double speed) {
+            this.x = x;
+            this.z = z;
+            this.yOffset = yOffset;
+            this.radius = 0.1;
+            this.maxRadius = 1.5 + (speed * 3.0);
+            this.expansionSpeed = 0.1 + (speed * 0.06);
+            this.particleCount = 12 + (int)(speed * 8);
+            this.alpha = 1.0f;
+
+            this.wavePhase = 0;
+            this.waveSpeed = 6.0 + speed * 2.0;
+            this.waveHeight = 0.2 + (speed * 0.4);
+        }
+
+        void tick(double deltaTime) {
+            radius += expansionSpeed;
+            wavePhase += waveSpeed * deltaTime;
+            alpha = (float) Math.max(0, 1.0 - (radius / maxRadius));
+        }
+
+        boolean isFinished() {
+            return radius >= maxRadius || alpha <= 0.05f;
+        }
+
+        double getWaveHeightAt(double distanceFromCenter) {
+            double normalizedDist = distanceFromCenter / maxRadius;
+            double waveProfile = Math.sin(wavePhase - normalizedDist * 6.0);
+            double envelope = Math.exp(-Math.pow(normalizedDist * 3.0 - 1.0, 2) * 2.0);
+            return waveProfile * envelope * waveHeight * alpha;
+        }
+    }
+
+    private double lastTickTime = 0;
+
     private void onTick(Minecraft mc) {
         if (mc.player == null || mc.level == null || mc.isPaused()) return;
+
+        double currentTime = System.currentTimeMillis() / 1000.0;
+        double deltaTime = Math.min(0.1, currentTime - lastTickTime);
+        lastTickTime = currentTime;
+
+        updateWaves(mc, deltaTime);
 
         Vec3 currentDesktop = mc.player.getEyePosition().add(mc.player.getLookAngle().scale(1.5));
         if (lastDesktopPos != null) {
@@ -53,6 +113,48 @@ public class WaterSplashHandler {
                 wasOffInWater = checkSplash(mc, currentOff, lastOffHandPos, HandType.OFFHAND, wasOffInWater);
             }
             lastOffHandPos = currentOff;
+        }
+    }
+
+    private void updateWaves(Minecraft mc, double deltaTime) {
+        Iterator<WaveRing> iterator = activeWaves.iterator();
+        while (iterator.hasNext()) {
+            WaveRing wave = iterator.next();
+            wave.tick(deltaTime);
+            spawnWaveParticles(mc, wave);
+            if (wave.isFinished()) {
+                iterator.remove();
+            }
+        }
+    }
+
+    private void spawnWaveParticles(Minecraft mc, WaveRing wave) {
+        if (wave.alpha <= 0.05f) return;
+
+        for (int i = 0; i < wave.particleCount; i++) {
+            double angle = (2 * Math.PI * i) / wave.particleCount;
+            double offsetX = Math.cos(angle) * wave.radius;
+            double offsetZ = Math.sin(angle) * wave.radius;
+
+            double waveH = wave.getWaveHeightAt(wave.radius);
+            double spread = 0.1 * wave.alpha;
+            double x = wave.x + offsetX + (Math.random() - 0.5) * spread;
+            double z = wave.z + offsetZ + (Math.random() - 0.5) * spread;
+            double y = wave.yOffset + Math.max(0, waveH);
+
+            mc.level.addParticle(
+                ParticleTypes.BUBBLE,
+                x, y, z,
+                0, wave.alpha * 0.01, 0
+            );
+
+            if (wave.alpha > 0.5 && i % 4 == 0) {
+                mc.level.addParticle(
+                    ParticleTypes.UNDERWATER,
+                    x, y - 0.1, z,
+                    0, 0, 0
+                );
+            }
         }
     }
 
@@ -81,7 +183,7 @@ public class WaterSplashHandler {
         return isInWater;
     }
 
-    // todo сделать волны, будет зависеть от удара по воде через GLSL Shader
+    // todo maybe later GLSL shader?
     private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType handType, boolean isEntry) {
         int particleCount = isEntry ? (int) Math.min(speed * 50, 15) : (int) Math.min(speed * 40, 10);
 
@@ -97,6 +199,20 @@ public class WaterSplashHandler {
             );
         }
 
+        if (speed > 0.15) {
+            int waveCount = isEntry ? 2 : 1;
+            double surfaceY = Math.floor(pos.y) + 0.95;
+
+            for (int w = 0; w < waveCount; w++) {
+                double adjustedSpeed = speed * (1.0 - w * 0.15);
+                if (adjustedSpeed > 0.1) {
+                    WaveRing wave = new WaveRing(pos.x, pos.z, surfaceY, adjustedSpeed);
+                    activeWaves.add(wave);
+                }
+            }
+        }
+
+        // todo мб раньше проигрывать звук волны // testing
         if (speed > 0.08 || isEntry) {
             float volume = isEntry ? (float) Math.min(speed * 2.5, 0.6) : (float) Math.min(speed * 1.5, 0.4);
             mc.level.playLocalSound(pos.x, pos.y, pos.z,
