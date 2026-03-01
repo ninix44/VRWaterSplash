@@ -31,6 +31,11 @@ public class WaterSplashHandler {
 
     private final List<WaveRing> activeWaves = new ArrayList<>();
 
+    private static final int MAX_WAVES = 6;
+    private static final int MAX_PARTICLES = 20;
+    private static final double MIN_SPEED_FOR_WAVES = 0.2;
+    private static final double WAVE_DECAY_RATE = 0.08;
+
     public WaterSplashHandler() {
         ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
     }
@@ -44,33 +49,51 @@ public class WaterSplashHandler {
         float alpha;
         double yOffset;
 
+        double directionX;
+        double directionZ;
+        double drift;
+
         double wavePhase;
         double waveSpeed;
         double waveHeight;
 
-        WaveRing(double x, double z, double yOffset, double speed) {
+        WaveRing(double x, double z, double yOffset, double speed, double dirX, double dirZ) {
             this.x = x;
             this.z = z;
             this.yOffset = yOffset;
             this.radius = 0.1;
-            this.maxRadius = 1.5 + (speed * 3.0);
-            this.expansionSpeed = 0.1 + (speed * 0.06);
-            this.particleCount = 12 + (int)(speed * 8);
+            this.maxRadius = 1.2 + (speed * 2.0);
+            this.expansionSpeed = 0.08 + (speed * 0.04);
+            this.particleCount = Math.min(MAX_PARTICLES, 8 + (int)(speed * 5));
             this.alpha = 1.0f;
 
+            this.directionX = dirX;
+            this.directionZ = dirZ;
+            this.drift = 0;
+
             this.wavePhase = 0;
-            this.waveSpeed = 6.0 + speed * 2.0;
-            this.waveHeight = 0.2 + (speed * 0.4);
+            this.waveSpeed = 5.0 + speed * 1.5;
+            this.waveHeight = 0.15 + (speed * 0.3);
         }
 
         void tick(double deltaTime) {
             radius += expansionSpeed;
             wavePhase += waveSpeed * deltaTime;
-            alpha = (float) Math.max(0, 1.0 - (radius / maxRadius));
+            alpha = (float) Math.max(0, 1.0 - (radius / maxRadius) * WAVE_DECAY_RATE);
+
+            drift += expansionSpeed * 0.2;
         }
 
         boolean isFinished() {
             return radius >= maxRadius || alpha <= 0.05f;
+        }
+
+        double getCurrentX() {
+            return x + directionX * drift;
+        }
+
+        double getCurrentZ() {
+            return z + directionZ * drift;
         }
 
         double getWaveHeightAt(double distanceFromCenter) {
@@ -117,6 +140,10 @@ public class WaterSplashHandler {
     }
 
     private void updateWaves(Minecraft mc, double deltaTime) {
+        while (activeWaves.size() > MAX_WAVES) {
+            activeWaves.remove(0);
+        }
+
         Iterator<WaveRing> iterator = activeWaves.iterator();
         while (iterator.hasNext()) {
             WaveRing wave = iterator.next();
@@ -131,6 +158,9 @@ public class WaterSplashHandler {
     private void spawnWaveParticles(Minecraft mc, WaveRing wave) {
         if (wave.alpha <= 0.05f) return;
 
+        double centerX = wave.getCurrentX();
+        double centerZ = wave.getCurrentZ();
+
         for (int i = 0; i < wave.particleCount; i++) {
             double angle = (2 * Math.PI * i) / wave.particleCount;
             double offsetX = Math.cos(angle) * wave.radius;
@@ -138,8 +168,8 @@ public class WaterSplashHandler {
 
             double waveH = wave.getWaveHeightAt(wave.radius);
             double spread = 0.1 * wave.alpha;
-            double x = wave.x + offsetX + (Math.random() - 0.5) * spread;
-            double z = wave.z + offsetZ + (Math.random() - 0.5) * spread;
+            double x = centerX + offsetX + (Math.random() - 0.5) * spread;
+            double z = centerZ + offsetZ + (Math.random() - 0.5) * spread;
             double y = wave.yOffset + Math.max(0, waveH);
 
             mc.level.addParticle(
@@ -148,13 +178,13 @@ public class WaterSplashHandler {
                 0, wave.alpha * 0.01, 0
             );
 
-            if (wave.alpha > 0.5 && i % 4 == 0) {
-                mc.level.addParticle(
-                    ParticleTypes.UNDERWATER,
-                    x, y - 0.1, z,
-                    0, 0, 0
-                );
-            }
+//            if (wave.alpha > 0.5 && i % 4 == 0) {
+//                mc.level.addParticle(
+//                    ParticleTypes.UNDERWATER,
+//                    x, y - 0.1, z,
+//                    0, 0, 0
+//                );
+//            }
         }
     }
 
@@ -169,14 +199,20 @@ public class WaterSplashHandler {
         double horizontalSpeed = Math.sqrt(movement.x * movement.x + movement.z * movement.z);
         double totalSpeed = movement.length();
 
+        double dirX = 0, dirZ = 0;
+        if (horizontalSpeed > 0.001) {
+            dirX = movement.x / horizontalSpeed;
+            dirZ = movement.z / horizontalSpeed;
+        }
+
         if (justEntered) {
             if (totalSpeed > 0.01) {
-                spawnSplash(mc, current, totalSpeed, hand, true);
+                spawnSplash(mc, current, totalSpeed, hand, true, dirX, dirZ);
             }
         }
         else if (isSurface) {
             if (horizontalSpeed > 0.07) {
-                spawnSplash(mc, current, horizontalSpeed, hand, false);
+                spawnSplash(mc, current, horizontalSpeed, hand, false, dirX, dirZ);
             }
         }
 
@@ -184,7 +220,7 @@ public class WaterSplashHandler {
     }
 
     // todo maybe later GLSL shader?
-    private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType handType, boolean isEntry) {
+    private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType handType, boolean isEntry, double dirX, double dirZ) {
         int particleCount = isEntry ? (int) Math.min(speed * 50, 15) : (int) Math.min(speed * 40, 10);
 
         for (int i = 0; i < particleCount; i++) {
@@ -199,14 +235,14 @@ public class WaterSplashHandler {
             );
         }
 
-        if (speed > 0.15) {
-            int waveCount = isEntry ? 2 : 1;
+        if (speed > MIN_SPEED_FOR_WAVES && activeWaves.size() < MAX_WAVES) {
+            int waveCount = 1; // maybe 2 wave? (but 1 wave == normal FPS, and 2 wave == idk)
             double surfaceY = Math.floor(pos.y) + 0.95;
 
             for (int w = 0; w < waveCount; w++) {
-                double adjustedSpeed = speed * (1.0 - w * 0.15);
-                if (adjustedSpeed > 0.1) {
-                    WaveRing wave = new WaveRing(pos.x, pos.z, surfaceY, adjustedSpeed);
+                double adjustedSpeed = speed * (1.0 - w * 0.1);
+                if (adjustedSpeed > MIN_SPEED_FOR_WAVES * 0.8) {
+                    WaveRing wave = new WaveRing(pos.x, pos.z, surfaceY, adjustedSpeed, dirX, dirZ);
                     activeWaves.add(wave);
                 }
             }
