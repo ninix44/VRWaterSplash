@@ -21,6 +21,10 @@ public class WaterSplashHandler {
     private Vec3 lastOffHandPos = null;
     private Vec3 lastDesktopPos = null;
 
+    private boolean wasMainInWater = false;
+    private boolean wasOffInWater = false;
+    private boolean wasDesktopInWater = false;
+
     public WaterSplashHandler() {
         ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
     }
@@ -30,7 +34,7 @@ public class WaterSplashHandler {
 
         Vec3 currentDesktop = mc.player.getEyePosition().add(mc.player.getLookAngle().scale(1.5));
         if (lastDesktopPos != null) {
-            checkSplash(mc, currentDesktop, lastDesktopPos, null);
+            wasDesktopInWater = checkSplash(mc, currentDesktop, lastDesktopPos, null, wasDesktopInWater);
         }
         lastDesktopPos = currentDesktop;
 
@@ -40,59 +44,79 @@ public class WaterSplashHandler {
 
             Vec3 currentMain = toVec3(pose.getMainHand().getPosition());
             if (lastMainHandPos != null) {
-                checkSplash(mc, currentMain, lastMainHandPos, HandType.MAIN);
+                wasMainInWater = checkSplash(mc, currentMain, lastMainHandPos, HandType.MAIN, wasMainInWater);
             }
             lastMainHandPos = currentMain;
 
             Vec3 currentOff = toVec3(pose.getOffhand().getPosition());
             if (lastOffHandPos != null) {
-                checkSplash(mc, currentOff, lastOffHandPos, HandType.OFFHAND);
+                wasOffInWater = checkSplash(mc, currentOff, lastOffHandPos, HandType.OFFHAND, wasOffInWater);
             }
             lastOffHandPos = currentOff;
         }
     }
 
-    private void checkSplash(Minecraft mc, Vec3 current, Vec3 last, HandType hand) {
-        double speed = current.distanceTo(last);
-        if (speed < 0.05) return;
-
+    private boolean checkSplash(Minecraft mc, Vec3 current, Vec3 last, HandType hand, boolean wasInWater) {
         BlockPos pos = BlockPos.containing(current.x, current.y, current.z);
-        if (mc.level.getBlockState(pos).is(Blocks.WATER) && mc.level.getBlockState(pos.above()).isAir()) {
-            spawnSplash(mc, current, speed, hand);
+        boolean isInWater = mc.level.getBlockState(pos).is(Blocks.WATER);
+
+        boolean justEntered = isInWater && !wasInWater;
+
+        Vec3 movement = current.subtract(last);
+        double horizontalSpeed = Math.sqrt(movement.x * movement.x + movement.z * movement.z);
+        double verticalSpeed = movement.y;
+        double totalSpeed = movement.length();
+
+        boolean isSurface = isInWater && mc.level.getBlockState(pos.above()).isAir();
+
+
+        if (isSurface || justEntered) {
+            if (justEntered && totalSpeed > 0.01) {
+                spawnSplash(mc, current, totalSpeed, hand, true);
+            }
+            else if (horizontalSpeed > 0.07 || verticalSpeed < -0.08) {
+                double splashForce = Math.max(horizontalSpeed, Math.abs(verticalSpeed));
+                spawnSplash(mc, current, splashForce, hand, false);
+            }
         }
+
+        return isInWater;
     }
 
-
-    // todo Если рука чуть-чуть входит в воду, то сразу плесканье сделать
     // todo сделать волны, будет зависеть от удара по воде через GLSL Shader
-    private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType handType) {
-        for (int i = 0; i < 10; i++) {
+    private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType handType, boolean isEntry) {
+        int particleCount = isEntry ? 3 : (int) Math.min(speed * 40, 12);
+
+        for (int i = 0; i < particleCount; i++) {
             mc.level.addParticle(
                 ParticleTypes.SPLASH,
-                pos.x + (Math.random() - 0.5) * 0.3,
-                Math.floor(pos.y) + 0.9,
-                pos.z + (Math.random() - 0.5) * 0.3,
-                0, 0.2, 0
+                pos.x + (Math.random() - 0.5) * 0.4,
+                Math.floor(pos.y) + 0.95,
+                pos.z + (Math.random() - 0.5) * 0.4,
+                (Math.random() - 0.5) * 0.1,
+                0.1 + Math.random() * 0.2,
+                (Math.random() - 0.5) * 0.1
             );
         }
 
-        if (speed > 0.1) {
+        if (speed > 0.08 || isEntry) {
+            float volume = isEntry ? 0.2f : (float) Math.min(speed * 2.0, 0.5);
             mc.level.playLocalSound(pos.x, pos.y, pos.z,
                 SoundEvents.PLAYER_SPLASH, SoundSource.PLAYERS,
-                0.4f, 1.0f + (float)(Math.random() * 0.4), false);
+                volume, 1.2f + (float)(Math.random() * 0.4), false);
 
-            // todo поиграться с вибрацией phoenixra
+            // todo добавить в ГУИ с другими аддонами настройку "регулятор" вибрации, чтобы настроить до идеала, а потом уже в коде поменять
             if (handType != null) {
-                float amplitude = (float) Math.min(speed * 4.0, 0.7);
+                float amplitude = isEntry ? 0.15f : (float) Math.min(speed * 3.0, 0.7);
 
-                float frequency = 120.0f;
-                float durationSeconds = 0.05f;
+                float frequency = isEntry ? 40.0f : 100.0f;
+                float duration = 0.05f;
 
                 VisorAPI.client().getInputManager().triggerHapticPulse(
                     handType,
                     frequency,
                     amplitude,
-                    durationSeconds
+                    duration
                 );
             }
         }
