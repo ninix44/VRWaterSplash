@@ -2,6 +2,7 @@ package org.vmstudio.watersplash.core.client;
 
 import org.vmstudio.visor.api.VisorAPI;
 import org.vmstudio.visor.api.common.addon.VisorAddon;
+import org.vmstudio.watersplash.core.client.handlers.WaterSplashHandler;
 import org.vmstudio.watersplash.core.client.overlays.VROverlayExample;
 import org.vmstudio.watersplash.core.common.VisorExample;
 import net.minecraft.network.chat.Component;
@@ -24,6 +25,8 @@ public class ExampleAddonClient implements VisorAddon {
                     )
                 )
             );
+
+        new WaterSplashHandler();
     }
 
     @Override

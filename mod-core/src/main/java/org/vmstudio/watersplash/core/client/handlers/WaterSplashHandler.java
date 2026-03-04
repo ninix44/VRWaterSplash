@@ -1,6 +1,5 @@
-package org.vmstudio.watersplash.fabric;
+package org.vmstudio.watersplash.core.client.handlers;
 
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import org.vmstudio.visor.api.VisorAPI;
 import org.vmstudio.visor.api.client.player.VRLocalPlayer;
 import org.vmstudio.visor.api.client.player.pose.PlayerPoseClient;
@@ -37,7 +36,9 @@ public class WaterSplashHandler {
     private static final double WAVE_DECAY_RATE = 0.08;
 
     public WaterSplashHandler() {
-        ClientTickEvents.END_CLIENT_TICK.register(this::onTick);
+        if (TickHandlerRegistry.registerHandler != null) {
+            TickHandlerRegistry.registerHandler.accept(this::onTick);
+        }
     }
 
     private static class WaveRing {
@@ -248,14 +249,12 @@ public class WaterSplashHandler {
             }
         }
 
-        // todo мб раньше проигрывать звук волны // testing
         if (speed > 0.08 || isEntry) {
             float volume = isEntry ? (float) Math.min(speed * 2.5, 0.6) : (float) Math.min(speed * 1.5, 0.4);
             mc.level.playLocalSound(pos.x, pos.y, pos.z,
                 SoundEvents.PLAYER_SPLASH, SoundSource.PLAYERS,
                 volume, 1.0f + (float)(Math.random() * 0.5), false);
 
-            // todo добавить в ГУИ с другими аддонами настройку "регулятор" вибрации, чтобы настроить до идеала, а потом уже в коде поменять
             if (handType != null) {
                 float amplitude = isEntry ? (float) Math.min(speed * 4.0, 0.8) : (float) Math.min(speed * 2.5, 0.5);
 
