@@ -1,4 +1,4 @@
-package dev.ninix.visor.watersplash.core.common;
+package org.vmstudio.watersplash.core.common;
 
 public class VisorExample {
     public static final String MOD_ID = "watersplash";

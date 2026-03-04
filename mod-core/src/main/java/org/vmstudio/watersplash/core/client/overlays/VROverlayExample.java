@@ -1,4 +1,4 @@
-package dev.ninix.visor.watersplash.core.client.overlays;
+package org.vmstudio.watersplash.core.client.overlays;
 
 
 import org.vmstudio.visor.api.client.gui.overlays.framework.VROverlayScreen;

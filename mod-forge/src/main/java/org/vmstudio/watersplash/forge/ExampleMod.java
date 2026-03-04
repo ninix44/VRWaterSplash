@@ -1,10 +1,10 @@
-package dev.ninix.visor.forge;
+package org.vmstudio.watersplash.forge;
 
 import org.vmstudio.visor.api.ModLoader;
 import org.vmstudio.visor.api.VisorAPI;
-import dev.ninix.visor.watersplash.core.client.ExampleAddonClient;
-import dev.ninix.visor.watersplash.core.common.VisorExample;
-import dev.ninix.visor.watersplash.core.server.ExampleAddonServer;
+import org.vmstudio.watersplash.core.client.ExampleAddonClient;
+import org.vmstudio.watersplash.core.common.VisorExample;
+import org.vmstudio.watersplash.core.server.ExampleAddonServer;
 import net.minecraftforge.fml.common.Mod;
 
 @Mod(VisorExample.MOD_ID)

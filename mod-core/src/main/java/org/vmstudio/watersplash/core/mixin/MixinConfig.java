@@ -1,15 +1,11 @@
-package dev.ninix.visor.watersplash.core.mixin;
+package org.vmstudio.watersplash.core.mixin;
 
-import org.vmstudio.visor.api.ModLoader;
-import dev.ninix.visor.watersplash.core.common.VisorExample;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
 import java.util.List;
 import java.util.Set;
-
-import static com.mojang.text2speech.Narrator.LOGGER;
 
 public class MixinConfig implements IMixinConfigPlugin {
 

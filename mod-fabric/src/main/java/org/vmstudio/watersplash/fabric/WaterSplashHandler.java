@@ -1,4 +1,4 @@
-package dev.ninix.visor.watersplash.fabric;
+package org.vmstudio.watersplash.fabric;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import org.vmstudio.visor.api.VisorAPI;

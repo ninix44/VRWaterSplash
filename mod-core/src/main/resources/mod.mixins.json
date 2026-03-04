@@ -1,7 +1,7 @@
 {
   "required": true,
-  "package": "dev.ninix.visor.watersplash.core.mixin",
-  "plugin": "dev.ninix.visor.watersplash.core.mixin.MixinConfig",
+  "package": "org.vmstudio.watersplash.core.mixin",
+  "plugin": "org.vmstudio.watersplash.core.mixin.MixinConfig",
   "compatibilityLevel": "JAVA_17",
   "client": [
   ],

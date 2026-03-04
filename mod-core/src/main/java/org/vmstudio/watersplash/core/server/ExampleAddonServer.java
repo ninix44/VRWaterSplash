@@ -1,7 +1,7 @@
-package dev.ninix.visor.watersplash.core.server;
+package org.vmstudio.watersplash.core.server;
 
 import org.vmstudio.visor.api.common.addon.VisorAddon;
-import dev.ninix.visor.watersplash.core.common.VisorExample;
+import org.vmstudio.watersplash.core.common.VisorExample;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -14,7 +14,7 @@ public class ExampleAddonServer implements VisorAddon {
 
     @Override
     public @Nullable String getAddonPackagePath() {
-        return "me.phoenixra.visorexample.core.server";
+        return "org.vmstudio.watersplash.core.server";
     }
 
     @Override
