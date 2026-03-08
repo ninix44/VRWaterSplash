@@ -10,6 +10,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3fc;
@@ -17,6 +20,7 @@ import org.joml.Vector3fc;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.WeakHashMap;
 
 public class WaterSplashHandler {
 
@@ -28,6 +32,8 @@ public class WaterSplashHandler {
     private boolean wasOffInWater = false;
     private boolean wasDesktopInWater = false;
 
+    private final WeakHashMap<Entity, Boolean> entityInWaterState = new WeakHashMap<>();
+    private final WeakHashMap<Entity, Double> entitySpeedBuffer = new WeakHashMap<>();
     private final List<WaveRing> activeWaves = new ArrayList<>();
 
     private static final int MAX_WAVES = 6;
@@ -115,6 +121,7 @@ public class WaterSplashHandler {
         lastTickTime = currentTime;
 
         updateWaves(mc, deltaTime);
+        processEntitySplashes(mc);
 
         Vec3 currentDesktop = mc.player.getEyePosition().add(mc.player.getLookAngle().scale(1.5));
         if (lastDesktopPos != null) {
@@ -137,6 +144,27 @@ public class WaterSplashHandler {
                 wasOffInWater = checkSplash(mc, currentOff, lastOffHandPos, HandType.OFFHAND, wasOffInWater);
             }
             lastOffHandPos = currentOff;
+        }
+    }
+
+    private void processEntitySplashes(Minecraft mc) {
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (entity instanceof ItemEntity itemEntity) {
+                double currentSpeed = entity.getDeltaMovement().length();
+                double smoothedSpeed = (entitySpeedBuffer.getOrDefault(entity, currentSpeed) + currentSpeed) / 2.0;
+                entitySpeedBuffer.put(entity, currentSpeed);
+
+                boolean wasInWater = entityInWaterState.getOrDefault(entity, false);
+                boolean isInWater = entity.isInWater();
+                if (isInWater && !wasInWater) {
+                    ItemStack stack = itemEntity.getItem();
+                    float weight = 1.0f + (1.0f - (stack.getMaxStackSize() / 64.0f));
+                    if (smoothedSpeed * weight > 0.05) {
+                        spawnSplash(mc, entity.position(), smoothedSpeed, null, true, 0, 0, weight);
+                    }
+                }
+                entityInWaterState.put(entity, isInWater);
+            }
         }
     }
 
@@ -206,67 +234,51 @@ public class WaterSplashHandler {
             dirZ = movement.z / horizontalSpeed;
         }
 
-        if (justEntered) {
-            if (totalSpeed > 0.01) {
-                spawnSplash(mc, current, totalSpeed, hand, true, dirX, dirZ);
-            }
-        }
-        else if (isSurface) {
-            if (horizontalSpeed > 0.07) {
-                spawnSplash(mc, current, horizontalSpeed, hand, false, dirX, dirZ);
-            }
+        if (justEntered && totalSpeed > 0.01) {
+            spawnSplash(mc, current, totalSpeed, hand, true, dirX, dirZ);
+        } else if (isSurface && horizontalSpeed > 0.07) {
+            spawnSplash(mc, current, horizontalSpeed, hand, false, dirX, dirZ);
         }
 
         return isInWater;
     }
 
-    // todo maybe later GLSL shader?
-    private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType handType, boolean isEntry, double dirX, double dirZ) {
-        int particleCount = isEntry ? (int) Math.min(speed * 50, 15) : (int) Math.min(speed * 40, 10);
+    private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType hand, boolean entry, double dx, double dz) {
+        spawnSplash(mc, pos, speed, hand, entry, dx, dz, 1.0f);
+    }
 
-        for (int i = 0; i < particleCount; i++) {
-            mc.level.addParticle(
-                ParticleTypes.SPLASH,
-                pos.x + (Math.random() - 0.5) * 0.4,
-                Math.floor(pos.y) + 0.95,
-                pos.z + (Math.random() - 0.5) * 0.4,
-                (Math.random() - 0.5) * 0.1,
-                isEntry ? 0.1 + Math.random() * 0.3 : 0.05 + Math.random() * 0.1,
-                (Math.random() - 0.5) * 0.1
-            );
+    private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType hand, boolean entry, double dx, double dz, float weight) {
+        int count = (int) (Math.min(speed * 50, entry ? 25 : 15) * weight);
+        for (int i = 0; i < count; i++) {
+            double spread = 0.4 * weight;
+            mc.level.addParticle(ParticleTypes.SPLASH,
+                pos.x + (Math.random() - 0.5) * spread, Math.floor(pos.y) + 0.95, pos.z + (Math.random() - 0.5) * spread,
+                (Math.random() - 0.5) * 0.1 * weight, (entry ? 0.15 : 0.08) * weight, (Math.random() - 0.5) * 0.1 * weight);
         }
 
-        if (speed > MIN_SPEED_FOR_WAVES && activeWaves.size() < MAX_WAVES) {
-            int waveCount = 1; // maybe 2 wave? (but 1 wave == normal FPS, and 2 wave == idk)
-            double surfaceY = Math.floor(pos.y) + 0.95;
-
-            for (int w = 0; w < waveCount; w++) {
-                double adjustedSpeed = speed * (1.0 - w * 0.1);
-                if (adjustedSpeed > MIN_SPEED_FOR_WAVES * 0.8) {
-                    WaveRing wave = new WaveRing(pos.x, pos.z, surfaceY, adjustedSpeed, dirX, dirZ);
-                    activeWaves.add(wave);
-                }
+        if (speed > 0.15) {
+            int bubbleCount = (int) (speed * 20 * weight);
+            for (int i = 0; i < bubbleCount; i++) {
+                mc.level.addParticle(ParticleTypes.BUBBLE,
+                    pos.x + (Math.random() - 0.5) * 0.5,
+                    pos.y + Math.random() * 0.3,
+                    pos.z + (Math.random() - 0.5) * 0.5,
+                    (Math.random() - 0.5) * 0.1,
+                    0.1 + Math.random() * 0.2,
+                    (Math.random() - 0.5) * 0.1);
             }
         }
 
-        if (speed > 0.08 || isEntry) {
-            float volume = isEntry ? (float) Math.min(speed * 2.5, 0.6) : (float) Math.min(speed * 1.5, 0.4);
-            mc.level.playLocalSound(pos.x, pos.y, pos.z,
-                SoundEvents.PLAYER_SPLASH, SoundSource.PLAYERS,
-                volume, 1.0f + (float)(Math.random() * 0.5), false);
+        if (speed * weight > MIN_SPEED_FOR_WAVES && activeWaves.size() < MAX_WAVES) {
+            activeWaves.add(new WaveRing(pos.x, pos.z, Math.floor(pos.y) + 0.95, speed * weight, dx, dz));
+        }
 
-            if (handType != null) {
-                float amplitude = isEntry ? (float) Math.min(speed * 4.0, 0.8) : (float) Math.min(speed * 2.5, 0.5);
+        if (speed > 0.08 || entry) {
+            float volume = (float) Math.min(speed * 2.5 * weight, 0.8);
+            mc.level.playLocalSound(pos.x, pos.y, pos.z, SoundEvents.PLAYER_SPLASH, SoundSource.PLAYERS, volume, 0.9f + (float) Math.random() * 0.2f, false);
 
-                float frequency = isEntry ? 120.0f : 70.0f;
-                float duration = 0.05f;
-
-                VisorAPI.client().getInputManager().triggerHapticPulse(
-                    handType,
-                    frequency,
-                    amplitude,
-                    duration
-                );
+            if (hand != null) {
+                VisorAPI.client().getInputManager().triggerHapticPulse(hand, entry ? 120f : 70f, entry ? 0.8f : 0.5f, 0.05f);
             }
         }
     }
