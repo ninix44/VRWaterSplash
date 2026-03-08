@@ -8,7 +8,6 @@ import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.fml.common.Mod;
 import org.vmstudio.visor.api.ModLoader;
 import org.vmstudio.visor.api.VisorAPI;
-import org.vmstudio.watersplash.core.client.ExampleAddonClient;
 import org.vmstudio.watersplash.core.client.handlers.TickHandlerRegistry;
 import org.vmstudio.watersplash.core.common.VisorExample;
 import org.vmstudio.watersplash.core.server.ExampleAddonServer;
@@ -32,7 +31,7 @@ public class ExampleMod {
             );
         }else{
             VisorAPI.registerAddon(
-                    new ExampleAddonClient()
+                    new ForgeAddonClient()
             );
         }
     }
