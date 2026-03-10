@@ -1,0 +1,9 @@
+{
+  "particles": {
+    "splash_plane": {
+      "textures": [
+        "watersplash:particle/splash_plane"
+      ]
+    }
+  }
+}
