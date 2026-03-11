@@ -12,6 +12,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -24,6 +25,16 @@ import java.util.WeakHashMap;
 
 public class WaterSplashHandler {
 
+    private static final double MIN_JUMP_SPEED = 0.15;
+
+    private static final int BASE_PARTICLE_COUNT = 15;
+    private static final double COUNT_MULTIPLIER = 50.0;
+    private static final int MAX_PARTICLE_COUNT = 150;
+
+    private static final double BASE_RADIUS = 0.3;
+    private static final double RADIUS_MULTIPLIER = 1.5;
+    private static final double MAX_RADIUS = 4.0;
+
     private Vec3 lastMainHandPos = null;
     private Vec3 lastOffHandPos = null;
     private Vec3 lastDesktopPos = null;
@@ -32,12 +43,15 @@ public class WaterSplashHandler {
     private boolean wasOffInWater = false;
     private boolean wasDesktopInWater = false;
 
+    private double lastPlayerY = 0;
+    private boolean wasPlayerInWater = false;
+
     private final WeakHashMap<Entity, Boolean> entityInWaterState = new WeakHashMap<>();
     private final WeakHashMap<Entity, Double> entitySpeedBuffer = new WeakHashMap<>();
     private final List<WaveRing> activeWaves = new ArrayList<>();
 
     private static final int MAX_WAVES = 6;
-    private static final int MAX_PARTICLES = 20;
+    private static final int MAX_PARTICLES_WAVE = 20;
     private static final double MIN_SPEED_FOR_WAVES = 0.2;
     private static final double WAVE_DECAY_RATE = 0.08;
 
@@ -71,7 +85,7 @@ public class WaterSplashHandler {
             this.radius = 0.1;
             this.maxRadius = 1.2 + (speed * 2.0);
             this.expansionSpeed = 0.08 + (speed * 0.04);
-            this.particleCount = Math.min(MAX_PARTICLES, 8 + (int)(speed * 5));
+            this.particleCount = Math.min(MAX_PARTICLES_WAVE, 8 + (int)(speed * 5));
             this.alpha = 1.0f;
 
             this.directionX = dirX;
@@ -87,7 +101,6 @@ public class WaterSplashHandler {
             radius += expansionSpeed;
             wavePhase += waveSpeed * deltaTime;
             alpha = (float) Math.max(0, 1.0 - (radius / maxRadius) * WAVE_DECAY_RATE);
-
             drift += expansionSpeed * 0.2;
         }
 
@@ -120,6 +133,7 @@ public class WaterSplashHandler {
         double deltaTime = Math.min(0.1, currentTime - lastTickTime);
         lastTickTime = currentTime;
 
+        handlePlayerJumpSplash(mc);
         updateWaves(mc, deltaTime);
         processEntitySplashes(mc);
 
@@ -144,6 +158,68 @@ public class WaterSplashHandler {
                 wasOffInWater = checkSplash(mc, currentOff, lastOffHandPos, HandType.OFFHAND, wasOffInWater);
             }
             lastOffHandPos = currentOff;
+        }
+    }
+
+    private void handlePlayerJumpSplash(Minecraft mc) {
+        Player player = mc.player;
+        boolean nowInWater = player.isInWater() || mc.level.getBlockState(player.blockPosition()).is(Blocks.WATER);
+        double currentY = player.getY();
+
+        double fallSpeed = lastPlayerY - currentY;
+
+        if (nowInWater && !wasPlayerInWater) {
+            if (fallSpeed >= MIN_JUMP_SPEED) {
+                spawnImmersiveJumpSplash(mc, player.position(), fallSpeed);
+            }
+        }
+
+        wasPlayerInWater = nowInWater;
+        lastPlayerY = currentY;
+    }
+
+    private void spawnImmersiveJumpSplash(Minecraft mc, Vec3 pos, double fallSpeed) {
+        int cloudCount = (int) (BASE_PARTICLE_COUNT + (fallSpeed * COUNT_MULTIPLIER));
+        cloudCount = Math.min(cloudCount, MAX_PARTICLE_COUNT);
+
+        double effectRadius = BASE_RADIUS + (fallSpeed * RADIUS_MULTIPLIER);
+        effectRadius = Math.min(effectRadius, MAX_RADIUS);
+
+        for (int i = 0; i < cloudCount; i++) {
+            double angle = (2 * Math.PI * i) / cloudCount;
+
+            double distance = Math.random() * effectRadius;
+
+            double offsetX = Math.cos(angle) * distance;
+            double offsetZ = Math.sin(angle) * distance;
+
+            double velocitySpeed = 0.05 + (fallSpeed * 0.15);
+            double vx = Math.cos(angle) * velocitySpeed;
+            double vz = Math.sin(angle) * velocitySpeed;
+
+            double vy = 0.02 + (Math.random() * 0.05);
+
+            mc.level.addParticle(ParticleTypes.CLOUD,
+                pos.x + offsetX, Math.floor(pos.y) + 0.95, pos.z + offsetZ,
+                vx, vy, vz);
+        }
+
+        int splashCount = (int) (20 + fallSpeed * 40);
+        for (int i = 0; i < splashCount; i++) {
+            double rx = (Math.random() - 0.5) * effectRadius * 0.5;
+            double rz = (Math.random() - 0.5) * effectRadius * 0.5;
+
+            mc.level.addParticle(ParticleTypes.SPLASH,
+                pos.x + rx, Math.floor(pos.y) + 0.95, pos.z + rz,
+                rx * 0.5, fallSpeed * 0.3, rz * 0.5);
+        }
+
+        float volume = (float) Math.min(fallSpeed * 3.0, 1.5);
+        mc.level.playLocalSound(pos.x, pos.y, pos.z, SoundEvents.PLAYER_SPLASH, SoundSource.PLAYERS, volume, 0.8f + (float) Math.random() * 0.4f, false);
+
+        if (VisorAPI.clientState().playMode().canPlayVR()) {
+            VisorAPI.client().getInputManager().triggerHapticPulse(HandType.MAIN, 200f, 1.0f, 0.15f);
+            VisorAPI.client().getInputManager().triggerHapticPulse(HandType.OFFHAND, 200f, 1.0f, 0.15f);
         }
     }
 
@@ -206,14 +282,6 @@ public class WaterSplashHandler {
                 x, y, z,
                 0, wave.alpha * 0.01, 0
             );
-
-//            if (wave.alpha > 0.5 && i % 4 == 0) {
-//                mc.level.addParticle(
-//                    ParticleTypes.UNDERWATER,
-//                    x, y - 0.1, z,
-//                    0, 0, 0
-//                );
-//            }
         }
     }
 
@@ -277,7 +345,7 @@ public class WaterSplashHandler {
             float volume = (float) Math.min(speed * 2.5 * weight, 0.8);
             mc.level.playLocalSound(pos.x, pos.y, pos.z, SoundEvents.PLAYER_SPLASH, SoundSource.PLAYERS, volume, 0.9f + (float) Math.random() * 0.2f, false);
 
-            if (hand != null) {
+            if (hand != null && VisorAPI.clientState().playMode().canPlayVR()) {
                 VisorAPI.client().getInputManager().triggerHapticPulse(hand, entry ? 120f : 70f, entry ? 0.8f : 0.5f, 0.05f);
             }
         }
