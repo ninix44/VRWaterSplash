@@ -18,33 +18,36 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3fc;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import java.util.WeakHashMap;
 
 public class WaterSplashHandler {
 
     private static final double MIN_JUMP_SPEED = 0.15;
+    private final List<DelayedSplash> delayedSplashes = new ArrayList<>();
+    private final WeakHashMap<Entity, Boolean> entityInWaterState = new WeakHashMap<>();
+    private final WeakHashMap<Entity, Double> entitySpeedBuffer = new WeakHashMap<>();
 
-    private static final int BASE_PARTICLE_COUNT = 15;
-    private static final double COUNT_MULTIPLIER = 50.0;
-    private static final int MAX_PARTICLE_COUNT = 150;
-
-    private static final double BASE_RADIUS = 0.3;
-    private static final double RADIUS_MULTIPLIER = 1.5;
-    private static final double MAX_RADIUS = 4.0;
-
+    private double lastPlayerY = 0;
+    private boolean wasPlayerInWater = false;
     private Vec3 lastMainHandPos = null;
     private Vec3 lastOffHandPos = null;
     private Vec3 lastDesktopPos = null;
-
     private boolean wasMainInWater = false;
     private boolean wasOffInWater = false;
     private boolean wasDesktopInWater = false;
 
-    private double lastPlayerY = 0;
-    private boolean wasPlayerInWater = false;
+    private static class DelayedSplash {
+        long spawnTime;
+        Vec3 pos;
 
-    private final WeakHashMap<Entity, Boolean> entityInWaterState = new WeakHashMap<>();
-    private final WeakHashMap<Entity, Double> entitySpeedBuffer = new WeakHashMap<>();
+        DelayedSplash(Vec3 pos) {
+            this.spawnTime = System.currentTimeMillis() + 300;
+            this.pos = pos;
+        }
+    }
 
     public WaterSplashHandler() {
         if (TickHandlerRegistry.registerHandler != null) {
@@ -57,6 +60,7 @@ public class WaterSplashHandler {
 
         handlePlayerJumpSplash(mc);
         processEntitySplashes(mc);
+        processDelayedSplashes(mc);
 
         Vec3 currentDesktop = mc.player.getEyePosition().add(mc.player.getLookAngle().scale(1.5));
         if (lastDesktopPos != null) {
@@ -82,6 +86,35 @@ public class WaterSplashHandler {
         }
     }
 
+    private void processDelayedSplashes(Minecraft mc) {
+        long now = System.currentTimeMillis();
+        Iterator<DelayedSplash> iterator = delayedSplashes.iterator();
+        while (iterator.hasNext()) {
+            DelayedSplash ds = iterator.next();
+            if (now >= ds.spawnTime) {
+                spawnDelayedParticles(mc, ds.pos);
+                iterator.remove();
+            }
+        }
+    }
+
+    private void spawnDelayedParticles(Minecraft mc, Vec3 pos) {
+        int count = 20;
+        for (int i = 0; i < count; i++) {
+            double startY = Math.floor(pos.y) + 1.5;
+            double rx = (Math.random() - 0.5) * 1.0;
+            double rz = (Math.random() - 0.5) * 1.0;
+
+            double vx = 0;
+            double vy = 0.1;
+            double vz = 0;
+
+            mc.level.addParticle(ParticleTypes.CLOUD,
+                pos.x + rx, startY, pos.z + rz,
+                vx, vy, vz);
+        }
+    }
+
     private void handlePlayerJumpSplash(Minecraft mc) {
         Player player = mc.player;
         boolean nowInWater = player.isInWater() || mc.level.getBlockState(player.blockPosition()).is(Blocks.WATER);
@@ -92,6 +125,7 @@ public class WaterSplashHandler {
         if (nowInWater && !wasPlayerInWater) {
             if (fallSpeed >= MIN_JUMP_SPEED) {
                 spawnImmersiveJumpSplash(mc, player.position(), fallSpeed);
+                delayedSplashes.add(new DelayedSplash(player.position()));
             }
         }
 
@@ -100,41 +134,6 @@ public class WaterSplashHandler {
     }
 
     private void spawnImmersiveJumpSplash(Minecraft mc, Vec3 pos, double fallSpeed) {
-        int cloudCount = (int) (BASE_PARTICLE_COUNT + (fallSpeed * COUNT_MULTIPLIER));
-        cloudCount = Math.min(cloudCount, MAX_PARTICLE_COUNT);
-
-        double effectRadius = BASE_RADIUS + (fallSpeed * RADIUS_MULTIPLIER);
-        effectRadius = Math.min(effectRadius, MAX_RADIUS);
-
-        for (int i = 0; i < cloudCount; i++) {
-            double angle = (2 * Math.PI * i) / cloudCount;
-
-            double distance = Math.random() * effectRadius;
-
-            double offsetX = Math.cos(angle) * distance;
-            double offsetZ = Math.sin(angle) * distance;
-
-            double velocitySpeed = 0.05 + (fallSpeed * 0.15);
-            double vx = Math.cos(angle) * velocitySpeed;
-            double vz = Math.sin(angle) * velocitySpeed;
-
-            double vy = 0.02 + (Math.random() * 0.05);
-
-            mc.level.addParticle(ParticleTypes.CLOUD,
-                pos.x + offsetX, Math.floor(pos.y) + 0.95, pos.z + offsetZ,
-                vx, vy, vz);
-        }
-
-        int splashCount = (int) (20 + fallSpeed * 40);
-        for (int i = 0; i < splashCount; i++) {
-            double rx = (Math.random() - 0.5) * effectRadius * 0.5;
-            double rz = (Math.random() - 0.5) * effectRadius * 0.5;
-
-            mc.level.addParticle(ParticleTypes.SPLASH,
-                pos.x + rx, Math.floor(pos.y) + 0.95, pos.z + rz,
-                rx * 0.5, fallSpeed * 0.3, rz * 0.5);
-        }
-
         float volume = (float) Math.min(fallSpeed * 3.0, 1.5);
         mc.level.playLocalSound(pos.x, pos.y, pos.z, SoundEvents.PLAYER_SPLASH, SoundSource.PLAYERS, volume, 0.8f + (float) Math.random() * 0.4f, false);
 
@@ -173,38 +172,24 @@ public class WaterSplashHandler {
         boolean justEntered = isInWater && !wasInWater;
 
         Vec3 movement = current.subtract(last);
-        double horizontalSpeed = Math.sqrt(movement.x * movement.x + movement.z * movement.z);
         double totalSpeed = movement.length();
-
-        if (justEntered && totalSpeed > 0.01) {
-            spawnSplash(mc, current, totalSpeed, hand, true);
-        } else if (isSurface && horizontalSpeed > 0.07) {
-            spawnSplash(mc, current, horizontalSpeed, hand, false);
-        }
-
+        if (justEntered && totalSpeed > 0.01) spawnSplash(mc, current, totalSpeed, hand, true);
+        else if (isSurface && Math.sqrt(movement.x * movement.x + movement.z * movement.z) > 0.07) spawnSplash(mc, current, 0.1, hand, false);
         return isInWater;
     }
 
-    private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType hand, boolean entry) {
-        spawnSplash(mc, pos, speed, hand, entry, 1.0f);
-    }
+    private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType hand, boolean entry) { spawnSplash(mc, pos, speed, hand, entry, 1.0f); }
 
     private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType hand, boolean entry, float weight) {
         int count = (int) (Math.min(speed * 50, entry ? 25 : 15) * weight);
         for (int i = 0; i < count; i++) {
             double spread = 0.4 * weight;
-            mc.level.addParticle(ParticleTypes.SPLASH,
-                pos.x + (Math.random() - 0.5) * spread, Math.floor(pos.y) + 0.95, pos.z + (Math.random() - 0.5) * spread,
-                (Math.random() - 0.5) * 0.1 * weight, (entry ? 0.15 : 0.08) * weight, (Math.random() - 0.5) * 0.1 * weight);
+            mc.level.addParticle(ParticleTypes.SPLASH, pos.x + (Math.random() - 0.5) * spread, Math.floor(pos.y) + 0.95, pos.z + (Math.random() - 0.5) * spread, (Math.random() - 0.5) * 0.1 * weight, (entry ? 0.15 : 0.08) * weight, (Math.random() - 0.5) * 0.1 * weight);
         }
-
         if (speed > 0.08 || entry) {
             float volume = (float) Math.min(speed * 2.5 * weight, 0.8);
             mc.level.playLocalSound(pos.x, pos.y, pos.z, SoundEvents.PLAYER_SPLASH, SoundSource.PLAYERS, volume, 0.9f + (float) Math.random() * 0.2f, false);
-
-            if (hand != null && VisorAPI.clientState().playMode().canPlayVR()) {
-                VisorAPI.client().getInputManager().triggerHapticPulse(hand, entry ? 120f : 70f, entry ? 0.8f : 0.5f, 0.05f);
-            }
+            if (hand != null && VisorAPI.clientState().playMode().canPlayVR()) VisorAPI.client().getInputManager().triggerHapticPulse(hand, entry ? 120f : 70f, entry ? 0.8f : 0.5f, 0.05f);
         }
     }
 
