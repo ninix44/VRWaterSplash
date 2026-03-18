@@ -178,7 +178,9 @@ public class WaterSplashHandler {
         return isInWater;
     }
 
-    private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType hand, boolean entry) { spawnSplash(mc, pos, speed, hand, entry, 1.0f); }
+    private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType hand, boolean entry) {
+        spawnSplash(mc, pos, speed, hand, entry, 1.0f);
+    }
 
     private void spawnSplash(Minecraft mc, Vec3 pos, double speed, HandType hand, boolean entry, float weight) {
         int count = (int) (Math.min(speed * 50, entry ? 25 : 15) * weight);
