@@ -34,10 +34,8 @@ public class WaterSplashHandler {
     private boolean wasPlayerInWater = false;
     private Vec3 lastMainHandPos = null;
     private Vec3 lastOffHandPos = null;
-    private Vec3 lastDesktopPos = null;
     private boolean wasMainInWater = false;
     private boolean wasOffInWater = false;
-    private boolean wasDesktopInWater = false;
 
     private static class DelayedSplash {
         long spawnTime;
@@ -61,12 +59,6 @@ public class WaterSplashHandler {
         handlePlayerJumpSplash(mc);
         processEntitySplashes(mc);
         processDelayedSplashes(mc);
-
-        Vec3 currentDesktop = mc.player.getEyePosition().add(mc.player.getLookAngle().scale(1.5));
-        if (lastDesktopPos != null) {
-            wasDesktopInWater = checkSplash(mc, currentDesktop, lastDesktopPos, null, wasDesktopInWater);
-        }
-        lastDesktopPos = currentDesktop;
 
         VRLocalPlayer vrPlayer = VisorAPI.client().getVRLocalPlayer();
         if (vrPlayer != null && VisorAPI.clientState().playMode().canPlayVR()) {
